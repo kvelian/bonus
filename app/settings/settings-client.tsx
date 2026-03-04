@@ -11,6 +11,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Pencil,
   Trash2,
   Plus,
@@ -20,6 +27,8 @@ import {
   Moon,
 } from "lucide-react";
 import type { Employee, BonusType, Fund } from "@/lib/types";
+import { getBonusTypeColor } from "@/lib/bonus-type-colors";
+import { cn } from "@/lib/utils";
 import {
   createEmployee,
   updateEmployee,
@@ -39,6 +48,8 @@ interface SettingsClientProps {
   funds: Fund[];
   defaultTaxRate: string;
   customIntroText: string;
+  defaultBonusTypeId: string;
+  defaultFundId: string;
 }
 
 export function SettingsClient({
@@ -47,6 +58,8 @@ export function SettingsClient({
   funds: initialFunds,
   defaultTaxRate: initialTaxRate,
   customIntroText: initialIntroText,
+  defaultBonusTypeId: initialDefaultBonusTypeId,
+  defaultFundId: initialDefaultFundId,
 }: SettingsClientProps) {
   const { theme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
@@ -81,6 +94,14 @@ export function SettingsClient({
       {/* Custom Intro Text */}
       <IntroTextSection initialText={initialIntroText} />
 
+      {/* Default values for new bonus */}
+      <DefaultBonusSection
+        bonusTypes={initialBonusTypes}
+        funds={initialFunds}
+        defaultBonusTypeId={initialDefaultBonusTypeId}
+        defaultFundId={initialDefaultFundId}
+      />
+
       <Separator />
 
       {/* Employees */}
@@ -101,7 +122,7 @@ export function SettingsClient({
       />
 
       {/* Bonus Types */}
-      <CrudSection
+      <CrudSection<BonusType>
         title="Типы премий"
         items={initialBonusTypes}
         onAdd={async (name) => {
@@ -115,6 +136,15 @@ export function SettingsClient({
         }}
         getItemLabel={(item) => item.name}
         placeholder="Название типа"
+        itemPrefix={(item) => (
+          <span
+            className={cn(
+              "shrink-0 w-2 h-2 rounded-full mr-2",
+              getBonusTypeColor(item.id)
+            )}
+            aria-hidden
+          />
+        )}
       />
 
       {/* Funds */}
@@ -178,6 +208,108 @@ function TaxRateSection({ initialRate }: { initialRate: string }) {
   );
 }
 
+// ── Default bonus type & fund (for new bonus modal) ──
+
+interface DefaultBonusSectionProps {
+  bonusTypes: BonusType[];
+  funds: Fund[];
+  defaultBonusTypeId: string;
+  defaultFundId: string;
+}
+
+function DefaultBonusSection({
+  bonusTypes,
+  funds,
+  defaultBonusTypeId: initialBonusTypeId,
+  defaultFundId: initialFundId,
+}: DefaultBonusSectionProps) {
+  const [bonusTypeId, setBonusTypeId] = useState(initialBonusTypeId);
+  const [fundId, setFundId] = useState(initialFundId);
+  const [isPending, startTransition] = useTransition();
+
+  const handleSave = () => {
+    startTransition(async () => {
+      await updateSetting("defaultBonusTypeId", bonusTypeId);
+      await updateSetting("defaultFundId", fundId);
+      toast.success("Значения по умолчанию сохранены");
+    });
+  };
+
+  const hasChanges =
+    bonusTypeId !== initialBonusTypeId || fundId !== initialFundId;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">
+          Значения по умолчанию для новой премии
+        </CardTitle>
+        <p className="text-sm text-muted-foreground font-normal">
+          Будут подставляться в форме добавления премии на главной странице.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label>Тип премии по умолчанию</Label>
+            <Select
+              value={bonusTypeId || "__none__"}
+              onValueChange={(v) => setBonusTypeId(v === "__none__" ? "" : v)}
+            >
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder="Не выбрано" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Не выбрано</SelectItem>
+                {bonusTypes.map((bt) => (
+                  <SelectItem key={bt.id} value={bt.id.toString()}>
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "shrink-0 w-2 h-2 rounded-full",
+                          getBonusTypeColor(bt.id)
+                        )}
+                        aria-hidden
+                      />
+                      {bt.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Фонд по умолчанию</Label>
+            <Select
+              value={fundId || "__none__"}
+              onValueChange={(v) => setFundId(v === "__none__" ? "" : v)}
+            >
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder="Не выбрано" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Не выбрано</SelectItem>
+                {funds.map((f) => (
+                  <SelectItem key={f.id} value={f.id.toString()}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={handleSave}
+            disabled={isPending || !hasChanges}
+            size="sm"
+          >
+            Сохранить
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Intro Text Section ──
 
 function IntroTextSection({ initialText }: { initialText: string }) {
@@ -230,6 +362,8 @@ interface CrudSectionProps<T extends { id: number }> {
   onDelete: (id: number) => Promise<void>;
   getItemLabel: (item: T) => string;
   placeholder: string;
+  /** Опциональный префикс перед названием (например, цветовой индикатор) */
+  itemPrefix?: (item: T) => React.ReactNode;
 }
 
 function CrudSection<T extends { id: number }>({
@@ -240,6 +374,7 @@ function CrudSection<T extends { id: number }>({
   onDelete,
   getItemLabel,
   placeholder,
+  itemPrefix,
 }: CrudSectionProps<T>) {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -346,7 +481,8 @@ function CrudSection<T extends { id: number }>({
                   </>
                 ) : (
                   <>
-                    <span className="flex-1 text-sm">
+                    {itemPrefix?.(item)}
+                    <span className="flex-1 text-sm min-w-0">
                       {getItemLabel(item)}
                     </span>
                     <Button

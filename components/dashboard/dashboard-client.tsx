@@ -37,6 +37,8 @@ interface DashboardClientProps {
   monthStatuses: MonthStatus[];
   defaultTaxRate: number;
   customIntroText: string;
+  defaultBonusTypeId: number | null;
+  defaultFundId: number | null;
 }
 
 export function DashboardClient({
@@ -48,6 +50,8 @@ export function DashboardClient({
   monthStatuses,
   defaultTaxRate,
   customIntroText,
+  defaultBonusTypeId,
+  defaultFundId,
 }: DashboardClientProps) {
   const router = useRouter();
   const [amountMode, setAmountMode] = useState<AmountMode>(() => {
@@ -192,6 +196,8 @@ export function DashboardClient({
         monthStatuses={monthStatuses}
         editBonus={bonusModal.editBonus}
         amountMode={amountMode}
+        defaultBonusTypeId={defaultBonusTypeId}
+        defaultFundId={defaultFundId}
       />
 
       <MonthStatusModal
@@ -203,6 +209,7 @@ export function DashboardClient({
         year={year}
         month={statusModal.month}
         monthStatuses={monthStatuses}
+        customIntroText={customIntroText}
         defaultTaxRate={defaultTaxRate}
         bonuses={bonuses}
         amountMode={amountMode}

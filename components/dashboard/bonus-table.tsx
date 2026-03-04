@@ -30,7 +30,9 @@ import {
   QUARTER_MONTHS,
   formatAmount,
 } from "@/lib/tax-utils";
+import { getBonusTypeColor } from "@/lib/bonus-type-colors";
 import { deleteBonus } from "@/lib/actions";
+import { handleGenerateNotification } from "./(helpers)/handleGenerateNotification";
 
 interface BonusTableProps {
   year: number;
@@ -279,24 +281,24 @@ function EmployeeRow({
 }: EmployeeRowProps) {
   const [isPending, startTransition] = useTransition();
 
-  const handleGenerateNotification = (month: number) => {
-    const key = `${employee.id}-${month}`;
-    const monthBonuses = bonusesByMonth.get(key) || [];
-    if (monthBonuses.length === 0) {
-      toast.error("Нет премий для генерации уведомления");
-      return;
-    }
+  // const handleGenerateNotification = (month: number) => {
+  //   const key = `${employee.id}-${month}`;
+  //   const monthBonuses = bonusesByMonth.get(key) || [];
+  //   if (monthBonuses.length === 0) {
+  //     toast.error("Нет премий для генерации уведомления");
+  //     return;
+  //   }
 
-    const lines = monthBonuses.map(
-      (b) =>
-        `- ${formatAmount(b.amountGross)}\u0420 за ${b.comment || b.bonusTypeName}`
-    );
-    const text = `${customIntroText}\n\n${lines.join("\n")}`;
+  //   const lines = monthBonuses.map(
+  //     (b) =>
+  //       `- ${formatAmount(b.amountGross)}\u0420 за ${b.comment || b.bonusTypeName}`
+  //   );
+  //   const text = `${customIntroText}\n\n${lines.join("\n")}`;
 
-    navigator.clipboard.writeText(text).then(() => {
-      toast.success("Уведомление скопировано в буфер обмена");
-    });
-  };
+  //   navigator.clipboard.writeText(text).then(() => {
+  //     toast.success("Уведомление скопировано в буфер обмена");
+  //   });
+  // };
 
   const handleDeleteBonus = (bonusId: number) => {
     startTransition(async () => {
@@ -337,12 +339,12 @@ function EmployeeRow({
             <td
               key={month}
               className={cn(
-                "px-2 py-2 text-center border-l border-border cursor-pointer",
+                "px-2 py-2 text-center border-l border-border",
                 QUARTER_BG[qi]
               )}
-              onClick={() => onOpenStatusModal(employee.id, month)}
             >
               <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-1">
                 <span
                   className={cn(
                     "text-xs tabular-nums",
@@ -353,11 +355,22 @@ function EmployeeRow({
                 >
                   {total > 0 ? formatAmount(total) : "\u2014"}
                 </span>
+                <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 cursor-pointer"
+                            onClick={() => onAddBonus(employee.id, month)}
+                            title="Добавить премию"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                          </div>
                 <span
                   className={cn(
-                    "inline-block h-1.5 w-1.5 rounded-full",
+                    "inline-block h-1.5 w-1.5 rounded-full cursor-pointer",
                     statusColor(status)
                   )}
+                  onClick={() => onOpenStatusModal(employee.id, month)}
                 />
               </div>
             </td>
@@ -403,7 +416,7 @@ function EmployeeRow({
                             variant="ghost"
                             size="sm"
                             className="h-6 w-6 p-0"
-                            onClick={() => handleGenerateNotification(month)}
+                            onClick={() => handleGenerateNotification(employee.id, month, bonusesByMonth.get(`${employee.id}-${month}`) || [], customIntroText)}
                             title="Сгенерировать уведомление"
                           >
                             <FileText className="h-3 w-3" />
@@ -444,6 +457,13 @@ function EmployeeRow({
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={cn(
+                                      "shrink-0 w-2 h-2 rounded-full",
+                                      getBonusTypeColor(bonus.bonusTypeId)
+                                    )}
+                                    aria-hidden
+                                  />
                                   <span className="font-medium tabular-nums">
                                     {formatAmount(
                                       getAmount(

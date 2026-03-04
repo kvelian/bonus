@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import type { BonusType, Fund, BonusWithDetails, MonthStatus, AmountMode } from "@/lib/types";
 import { createBonus, updateBonus } from "@/lib/actions";
 import {
@@ -28,6 +29,7 @@ import {
   getEffectiveTaxRateSync,
   MONTH_FULL_NAMES,
 } from "@/lib/tax-utils";
+import { getBonusTypeColor } from "@/lib/bonus-type-colors";
 
 interface BonusModalProps {
   open: boolean;
@@ -41,6 +43,8 @@ interface BonusModalProps {
   monthStatuses: MonthStatus[];
   editBonus?: BonusWithDetails;
   amountMode: AmountMode;
+  defaultBonusTypeId?: number | null;
+  defaultFundId?: number | null;
 }
 
 export function BonusModal({
@@ -55,6 +59,8 @@ export function BonusModal({
   monthStatuses,
   editBonus,
   amountMode,
+  defaultBonusTypeId,
+  defaultFundId,
 }: BonusModalProps) {
   const [isPending, startTransition] = useTransition();
   const [bonusTypeId, setBonusTypeId] = useState<string>(
@@ -76,16 +82,34 @@ export function BonusModal({
     }
   };
 
-  // Reset fields when editBonus changes
+  // Resolve default bonus type: from editBonus, then from settings (if valid), then first item
+  const resolvedDefaultBonusTypeId = (() => {
+    if (editBonus?.bonusTypeId != null) return editBonus.bonusTypeId.toString();
+    if (defaultBonusTypeId != null && bonusTypes.some((bt) => bt.id === defaultBonusTypeId)) {
+      return defaultBonusTypeId.toString();
+    }
+    return bonusTypes[0]?.id?.toString() ?? "";
+  })();
+
+  // Resolve default fund: from editBonus, then from settings (if valid), then first item
+  const resolvedDefaultFundId = (() => {
+    if (editBonus?.fundId != null) return editBonus.fundId.toString();
+    if (defaultFundId != null && funds.some((f) => f.id === defaultFundId)) {
+      return defaultFundId.toString();
+    }
+    return funds[0]?.id?.toString() ?? "";
+  })();
+
+  // Reset fields when modal opens or editBonus / lists change
   useEffect(() => {
     if (open) {
-      setBonusTypeId(editBonus?.bonusTypeId?.toString() || (bonusTypes[0]?.id?.toString() ?? ""));
-      setFundId(editBonus?.fundId?.toString() || (funds[0]?.id?.toString() ?? ""));
+      setBonusTypeId(resolvedDefaultBonusTypeId);
+      setFundId(resolvedDefaultFundId);
       setAmount(editBonus?.amountGross?.toString() || "");
       setComment(editBonus?.comment || "");
       setInputAsNet(false);
     }
-  }, [open, editBonus, bonusTypes, funds]);
+  }, [open, editBonus, resolvedDefaultBonusTypeId, resolvedDefaultFundId]);
 
   const taxRate = getEffectiveTaxRateSync(
     employeeId,
@@ -178,7 +202,16 @@ export function BonusModal({
               <SelectContent>
                 {bonusTypes.map((bt) => (
                   <SelectItem key={bt.id} value={bt.id.toString()}>
-                    {bt.name}
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "shrink-0 w-2 h-2 rounded-full",
+                          getBonusTypeColor(bt.id)
+                        )}
+                        aria-hidden
+                      />
+                      {bt.name}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

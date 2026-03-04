@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { toast } from "sonner";
+import { handleGenerateNotification } from "./(helpers)/handleGenerateNotification";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,9 @@ import {
   MONTH_FULL_NAMES,
   formatAmount,
 } from "@/lib/tax-utils";
+import { getBonusTypeColor } from "@/lib/bonus-type-colors";
+import { cn } from "@/lib/utils";
+import { FileText } from "lucide-react";
 
 interface MonthStatusModalProps {
   open: boolean;
@@ -36,6 +40,7 @@ interface MonthStatusModalProps {
   year: number;
   month: number;
   monthStatuses: MonthStatus[];
+  customIntroText: string;
   defaultTaxRate: number;
   bonuses: BonusWithDetails[];
   amountMode: AmountMode;
@@ -48,6 +53,7 @@ export function MonthStatusModal({
   year,
   month,
   monthStatuses,
+  customIntroText,
   defaultTaxRate,
   bonuses,
   amountMode,
@@ -152,19 +158,81 @@ export function MonthStatusModal({
 
           {monthBonuses.length > 0 && (
             <div className="border-t border-border pt-3">
-              <p className="text-xs font-medium text-muted-foreground mb-2">
+              <div className="flex items-center gap-1 mb-2">
+              <p className="text-xs font-medium text-muted-foreground">
                 Премии за месяц ({monthBonuses.length})
               </p>
+              <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => handleGenerateNotification(employeeId, month, bonuses, customIntroText)}
+                            title="Сгенерировать уведомление"
+                          >
+                            <FileText className="h-3 w-3" />
+                          </Button>
+              </div>
               <div className="flex flex-col gap-1">
-                {monthBonuses.map((b) => (
+              {monthBonuses.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          Нет премий
+                        </p>
+                      ) : (
+                        <div className="flex flex-col gap-1.5">
+                          {monthBonuses.map((bonus) => (
+                            <div
+                              key={bonus.id}
+                              className="flex items-start justify-between gap-2 text-xs group"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={cn(
+                                      "shrink-0 w-2 h-2 rounded-full",
+                                      getBonusTypeColor(bonus.bonusTypeId)
+                                    )}
+                                    aria-hidden
+                                  />
+                                  <span className="font-medium tabular-nums">
+                                  {formatAmount(
+                        amountMode === "gross"
+                          ? bonus.amountGross
+                          : grossToNet(bonus.amountGross, effectiveTaxRate)
+                      )}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    {bonus.bonusTypeName}
+                                  </span>
+                                </div>
+                                <div className="text-muted-foreground truncate">
+                                  {bonus.fundName}
+                                  {bonus.comment && ` \u2022 ${bonus.comment}`}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-1 border-t border-border text-xs font-medium tabular-nums">
+                            Итого:{" "}
+                            {formatAmount(amountMode === "gross" ? totalGross : totalNet)}
+                          </div>
+                        </div>
+                      )}
+                {/* {monthBonuses.map((b) => (
                   <div
                     key={b.id}
-                    className="flex items-center justify-between text-xs"
+                    className="flex items-center justify-between text-xs gap-2"
                   >
-                    <span className="text-muted-foreground">
-                      {b.bonusTypeName}
+                    <span className="flex items-center gap-1.5 text-muted-foreground min-w-0">
+                      <span
+                        className={cn(
+                          "shrink-0 w-2 h-2 rounded-full",
+                          getBonusTypeColor(b.bonusTypeId)
+                        )}
+                        aria-hidden
+                      />
+                      <span className="truncate">{b.bonusTypeName}</span>
                     </span>
-                    <span className="tabular-nums font-medium">
+                    <span className="tabular-nums font-medium shrink-0">
                       {formatAmount(
                         amountMode === "gross"
                           ? b.amountGross
@@ -178,7 +246,7 @@ export function MonthStatusModal({
                   <span className="tabular-nums">
                     {formatAmount(amountMode === "gross" ? totalGross : totalNet)}
                   </span>
-                </div>
+                </div> */}
               </div>
             </div>
           )}

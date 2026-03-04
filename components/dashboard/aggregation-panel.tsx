@@ -14,6 +14,8 @@ import {
   getEffectiveTaxRateSync,
   formatAmount,
 } from "@/lib/tax-utils";
+import { getBonusTypeColor } from "@/lib/bonus-type-colors";
+import { cn } from "@/lib/utils";
 
 interface AggregationPanelProps {
   bonuses: BonusWithDetails[];
@@ -54,6 +56,7 @@ export function AggregationPanel({
     }
     return bonusTypes
       .map((bt) => ({
+        id: bt.id,
         name: bt.name,
         total: map.get(bt.id) || 0,
       }))
@@ -109,11 +112,20 @@ export function AggregationPanel({
             <div className="flex flex-col gap-1.5">
               {byBonusType.map((r) => (
                 <div
-                  key={r.name}
-                  className="flex items-center justify-between text-sm"
+                  key={r.id}
+                  className="flex items-center justify-between text-sm gap-2"
                 >
-                  <span className="text-muted-foreground">{r.name}</span>
-                  <span className="font-medium tabular-nums">
+                  <span className="flex items-center gap-1.5 text-muted-foreground min-w-0">
+                    <span
+                      className={cn(
+                        "shrink-0 w-2 h-2 rounded-full",
+                        getBonusTypeColor(r.id)
+                      )}
+                      aria-hidden
+                    />
+                    <span className="truncate">{r.name}</span>
+                  </span>
+                  <span className="font-medium tabular-nums shrink-0">
                     {formatAmount(r.total)}
                   </span>
                 </div>

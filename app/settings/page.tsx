@@ -7,13 +7,15 @@ import {
 import { SettingsClient } from "./settings-client";
 
 export default async function SettingsPage() {
-  const [employees, bonusTypes, funds, defaultTaxRate, customIntroText] =
+  const [employees, bonusTypes, funds, defaultTaxRate, customIntroText, defaultBonusTypeId, defaultFundId] =
     await Promise.all([
       getEmployees(),
       getBonusTypes(),
       getFunds(),
       getSetting("defaultTaxRate"),
       getSetting("customIntroText"),
+      getSetting("defaultBonusTypeId"),
+      getSetting("defaultFundId"),
     ]);
 
   return (
@@ -25,6 +27,8 @@ export default async function SettingsPage() {
         funds={funds}
         defaultTaxRate={defaultTaxRate ?? "13"}
         customIntroText={customIntroText ?? ""}
+        defaultBonusTypeId={defaultBonusTypeId ?? ""}
+        defaultFundId={defaultFundId ?? ""}
       />
     </div>
   );

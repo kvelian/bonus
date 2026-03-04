@@ -31,7 +31,7 @@ export default function RootLayout({
             <AppHeader />
             <main className="flex-1">{children}</main>
           </div>
-          <Toaster richColors position="top-right" />
+          <Toaster richColors closeButton />
         </ThemeProvider>
       </body>
     </html>
