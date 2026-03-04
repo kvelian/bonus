@@ -1,0 +1,7 @@
+{
+  "driver": "turso",
+  "connection": {
+    "url": "http://localhost:8080"
+  },
+  "port": 4000
+}
