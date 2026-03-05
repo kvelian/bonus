@@ -552,6 +552,14 @@ function EmployeeRow({
                   const key = `${employee.id}-${month}`;
                   const monthBonuses = bonusesByMonth.get(key) || [];
                   if (monthBonuses.length === 0 && !expanded) return null;
+                  const effectiveTaxRate = getEffectiveTaxRateSync(
+                    employee.id,
+                    year,
+                    month,
+                    monthStatuses,
+                    defaultTaxRate
+                  );
+                  const showTaxRate = effectiveTaxRate !== defaultTaxRate;
 
                   return (
                     <div
@@ -559,9 +567,16 @@ function EmployeeRow({
                       className="rounded-md border border-border bg-card p-3"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium">
-                          {MONTH_NAMES[month - 1]}
-                        </span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium">
+                            {MONTH_NAMES[month - 1]}
+                          </span>
+                          {showTaxRate && (
+                            <span className="text-[10px] text-muted-foreground">
+                              Налог: {effectiveTaxRate}%
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
