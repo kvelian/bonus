@@ -163,6 +163,54 @@ export function BonusTable({
     [employees, bonusesByEmployeeMonth, amountMode, monthStatuses, defaultTaxRate, year]
   );
 
+  // По типам премии: по месяцам и по кварталам
+  const summaryByMonthByBonusType = useMemo(() => {
+    const out = new Map<number, number[]>();
+    bonusTypes.forEach((bt) => out.set(bt.id, Array(12).fill(0)));
+    for (const b of bonuses) {
+      const amt = getAmount(b.amountGross, b.employeeId, b.month);
+      const arr = out.get(b.bonusTypeId)!;
+      arr[b.month - 1] += amt;
+    }
+    return out;
+  }, [bonuses, bonusTypes, amountMode, monthStatuses, defaultTaxRate, year]);
+
+  const summaryByQuarterByBonusType = useMemo(() => {
+    const out = new Map<number, number[]>();
+    bonusTypes.forEach((bt) => out.set(bt.id, [0, 0, 0, 0]));
+    for (const b of bonuses) {
+      const amt = getAmount(b.amountGross, b.employeeId, b.month);
+      const qi = Math.floor((b.month - 1) / 3);
+      const arr = out.get(b.bonusTypeId)!;
+      arr[qi] += amt;
+    }
+    return out;
+  }, [bonuses, bonusTypes, amountMode, monthStatuses, defaultTaxRate, year]);
+
+  // По фондам: по месяцам и по кварталам
+  const summaryByMonthByFund = useMemo(() => {
+    const out = new Map<number, number[]>();
+    funds.forEach((f) => out.set(f.id, Array(12).fill(0)));
+    for (const b of bonuses) {
+      const amt = getAmount(b.amountGross, b.employeeId, b.month);
+      const arr = out.get(b.fundId)!;
+      arr[b.month - 1] += amt;
+    }
+    return out;
+  }, [bonuses, funds, amountMode, monthStatuses, defaultTaxRate, year]);
+
+  const summaryByQuarterByFund = useMemo(() => {
+    const out = new Map<number, number[]>();
+    funds.forEach((f) => out.set(f.id, [0, 0, 0, 0]));
+    for (const b of bonuses) {
+      const amt = getAmount(b.amountGross, b.employeeId, b.month);
+      const qi = Math.floor((b.month - 1) / 3);
+      const arr = out.get(b.fundId)!;
+      arr[qi] += amt;
+    }
+    return out;
+  }, [bonuses, funds, amountMode, monthStatuses, defaultTaxRate, year]);
+
   const statusColor = (status: string) => {
     switch (status) {
       case "accrued":
@@ -282,27 +330,55 @@ export function BonusTable({
               {formatAmount(summaryYearTotal)}
             </td>
           </tr>
-          {/* Итого по кварталам */}
-          <tr className="border-t border-border bg-muted/30 font-medium">
-            <td className="sticky left-0 z-10 bg-muted/30 px-3 py-2 text-left text-muted-foreground text-xs">
-              По кварталам
-            </td>
-            {summaryByQuarter.map((total, qi) => (
-              <td
-                key={qi}
-                colSpan={3}
-                className={cn(
-                  "px-2 py-2 text-center border-l border-border tabular-nums text-xs",
-                  QUARTER_BG[qi]
-                )}
-              >
-                {total > 0 ? formatAmount(total) : "\u2014"}
-              </td>
-            ))}
-            <td className="px-3 py-2 text-right tabular-nums border-l border-border bg-muted/30 text-xs">
-              {formatAmount(summaryYearTotal)}
-            </td>
-          </tr>
+           {/* По типу премии — по месяцам */}
+          {bonusTypes.map((bt) => {
+            const monthTotals = summaryByMonthByBonusType.get(bt.id) || Array(12).fill(0);
+            const yearTotal = monthTotals.reduce((a, b) => a + b, 0);
+            if (yearTotal === 0) return null;
+            return (
+              <tr key={`type-m-${bt.id}`} className="border-t border-border bg-muted/20">
+                <td className="sticky left-0 z-10 bg-muted/20 px-3 py-1.5 text-left text-xs text-muted-foreground">
+                  <span className={cn("inline-block w-2 h-2 rounded-full shrink-0 mr-1.5", getBonusTypeColor(bt.id))} aria-hidden />
+                  {bt.name}
+                </td>
+                {monthTotals.map((total, i) => {
+                  const qi = Math.floor(i / 3);
+                  return (
+                    <td key={i} className={cn("px-2 py-1.5 text-center border-l border-border tabular-nums text-xs", QUARTER_BG[qi])}>
+                      {total > 0 ? formatAmount(total) : "\u2014"}
+                    </td>
+                  );
+                })}
+                <td className="px-3 py-1.5 text-right tabular-nums border-l border-border bg-muted/20 text-xs font-medium">
+                  {formatAmount(yearTotal)}
+                </td>
+              </tr>
+            );
+          })}
+          {/* По фонду — по месяцам */}
+          {funds.map((f) => {
+            const monthTotals = summaryByMonthByFund.get(f.id) || Array(12).fill(0);
+            const yearTotal = monthTotals.reduce((a, b) => a + b, 0);
+            if (yearTotal === 0) return null;
+            return (
+              <tr key={`fund-m-${f.id}`} className="border-t border-border bg-muted/20">
+                <td className="sticky left-0 z-10 bg-muted/20 px-3 py-1.5 text-left text-xs text-muted-foreground">
+                  {f.name}
+                </td>
+                {monthTotals.map((total, i) => {
+                  const qi = Math.floor(i / 3);
+                  return (
+                    <td key={i} className={cn("px-2 py-1.5 text-center border-l border-border tabular-nums text-xs", QUARTER_BG[qi])}>
+                      {total > 0 ? formatAmount(total) : "\u2014"}
+                    </td>
+                  );
+                })}
+                <td className="px-3 py-1.5 text-right tabular-nums border-l border-border bg-muted/20 text-xs font-medium">
+                  {formatAmount(yearTotal)}
+                </td>
+              </tr>
+            );
+          })}
         </tfoot>
       </table>
     </div>

@@ -188,6 +188,7 @@ export function DashboardClient({
         open={bonusModal.open}
         onClose={() => setBonusModal({ open: false, employeeId: 0, month: 0 })}
         employeeId={bonusModal.employeeId}
+        employeeFullName={employees.find((e) => e.id === bonusModal.employeeId)?.fullName}
         year={year}
         month={bonusModal.month}
         bonusTypes={bonusTypes}

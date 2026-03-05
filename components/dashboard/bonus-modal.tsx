@@ -36,6 +36,7 @@ interface BonusModalProps {
   open: boolean;
   onClose: () => void;
   employeeId: number;
+  employeeFullName?: string;
   year: number;
   month: number;
   bonusTypes: BonusType[];
@@ -52,6 +53,7 @@ export function BonusModal({
   open,
   onClose,
   employeeId,
+  employeeFullName,
   year,
   month,
   bonusTypes,
@@ -189,6 +191,12 @@ export function BonusModal({
             {editBonus ? "Редактировать премию" : "Новая премия"}
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
+            {employeeFullName && (
+              <>
+                <span className="font-medium text-foreground">{employeeFullName}</span>
+                {" · "}
+              </>
+            )}
             {MONTH_FULL_NAMES[month - 1]} {year} | Налог: {taxRate}%
           </p>
         </DialogHeader>
