@@ -28,6 +28,7 @@ import {
   netToGross,
   getEffectiveTaxRateSync,
   MONTH_FULL_NAMES,
+  grossToNet,
 } from "@/lib/tax-utils";
 import { getBonusTypeColor } from "@/lib/bonus-type-colors";
 
@@ -257,6 +258,11 @@ export function BonusModal({
             {inputAsNet && amount && !isNaN(parseFloat(amount)) && (
               <p className="text-xs text-muted-foreground">
                 GROSS: {netToGross(parseFloat(amount), taxRate).toFixed(2)}
+              </p>
+            )}
+            {!inputAsNet && amount && !isNaN(parseFloat(amount)) && (
+              <p className="text-xs text-muted-foreground">
+                NET: {grossToNet(parseFloat(amount), taxRate).toFixed(2)}
               </p>
             )}
           </div>

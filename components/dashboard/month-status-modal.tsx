@@ -116,7 +116,7 @@ export function MonthStatusModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-m flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {MONTH_FULL_NAMES[month - 1]} {year}
@@ -126,7 +126,7 @@ export function MonthStatusModal({
         <div className="flex flex-col gap-4 py-2">
           <div className="flex flex-col gap-2">
             <Label>Статус</Label>
-            <Select value={status} onValueChange={setStatus}>
+            <Select value={status} onValueChange={(value) => setStatus(value as "none" | "accrued" | "notified")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -204,7 +204,7 @@ export function MonthStatusModal({
                                     {bonus.bonusTypeName}
                                   </span>
                                 </div>
-                                <div className="text-muted-foreground truncate">
+                                <div className="text-muted-foreground">
                                   {bonus.fundName}
                                   {bonus.comment && ` \u2022 ${bonus.comment}`}
                                 </div>

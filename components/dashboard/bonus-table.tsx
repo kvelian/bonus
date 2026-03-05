@@ -134,6 +134,35 @@ export function BonusTable({
     );
   };
 
+  // Сумма по месяцам (по всем сотрудникам)
+  const summaryByMonth = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => i + 1).map((month) =>
+      employees.reduce(
+        (sum, emp) => sum + getMonthTotal(emp.id, month),
+        0
+      )
+    );
+  }, [employees, bonusesByEmployeeMonth, amountMode, monthStatuses, defaultTaxRate, year]);
+
+  // Сумма по кварталам (по всем сотрудникам)
+  const summaryByQuarter = useMemo(() => {
+    return [0, 1, 2, 3].map((quarter) =>
+      employees.reduce(
+        (sum, emp) => sum + getEmployeeQuarterTotal(emp.id, quarter),
+        0
+      )
+    );
+  }, [employees, bonusesByEmployeeMonth, amountMode, monthStatuses, defaultTaxRate, year]);
+
+  const summaryYearTotal = useMemo(
+    () =>
+      employees.reduce(
+        (sum, emp) => sum + getEmployeeYearTotal(emp.id),
+        0
+      ),
+    [employees, bonusesByEmployeeMonth, amountMode, monthStatuses, defaultTaxRate, year]
+  );
+
   const statusColor = (status: string) => {
     switch (status) {
       case "accrued":
@@ -229,6 +258,52 @@ export function BonusTable({
             />
           ))}
         </tbody>
+        <tfoot>
+          {/* Итого по месяцам */}
+          <tr className="border-t-2 border-border bg-muted/40 font-medium">
+            <td className="sticky left-0 z-10 bg-muted/40 px-3 py-2 text-left">
+              Итого
+            </td>
+            {summaryByMonth.map((total, i) => {
+              const qi = Math.floor(i / 3);
+              return (
+                <td
+                  key={i}
+                  className={cn(
+                    "px-2 py-2 text-center border-l border-border tabular-nums",
+                    QUARTER_BG[qi]
+                  )}
+                >
+                  {total > 0 ? formatAmount(total) : "\u2014"}
+                </td>
+              );
+            })}
+            <td className="px-3 py-2 text-right tabular-nums border-l border-border bg-muted/40">
+              {formatAmount(summaryYearTotal)}
+            </td>
+          </tr>
+          {/* Итого по кварталам */}
+          <tr className="border-t border-border bg-muted/30 font-medium">
+            <td className="sticky left-0 z-10 bg-muted/30 px-3 py-2 text-left text-muted-foreground text-xs">
+              По кварталам
+            </td>
+            {summaryByQuarter.map((total, qi) => (
+              <td
+                key={qi}
+                colSpan={3}
+                className={cn(
+                  "px-2 py-2 text-center border-l border-border tabular-nums text-xs",
+                  QUARTER_BG[qi]
+                )}
+              >
+                {total > 0 ? formatAmount(total) : "\u2014"}
+              </td>
+            ))}
+            <td className="px-3 py-2 text-right tabular-nums border-l border-border bg-muted/30 text-xs">
+              {formatAmount(summaryYearTotal)}
+            </td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
