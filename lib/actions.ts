@@ -205,6 +205,7 @@ export async function applyBonusesToExternalPage(params: {
       const commentClass = b.bonusTypeExternalCommentClass?.trim() ?? "";
       if (!amountClass || !commentClass) return null;
       return {
+        employeeId: b.employeeId,
         employeeFullName: b.employeeFullName,
         amountGross: b.amountGross,
         comment: b.comment ?? "",

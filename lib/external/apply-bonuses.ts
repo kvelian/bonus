@@ -1,11 +1,39 @@
 import puppeteer, { type ElementHandle, type Page } from "puppeteer";
 
 export type ExternalBonusToApply = {
+  employeeId: number;
   employeeFullName: string;
   amountGross: number;
   comment: string;
   amountClass: string;
   commentClass: string;
+};
+
+export type ExternalApplyProgressEvent = {
+  total: number;
+  processed: number;
+  applied: number;
+  errorsCount: number;
+  currentEmployeeId: number;
+  currentEmployeeFullName: string;
+};
+
+export type ExternalApplyErrorEvent = {
+  employeeId: number;
+  employeeFullName: string;
+  reason: string;
+  total: number;
+  processed: number;
+  applied: number;
+  errorsCount: number;
+};
+
+export type ExternalEmployeeCompletedEvent = {
+  employeeId: number;
+  employeeFullName: string;
+  succeeded: boolean;
+  employeeApplied: number;
+  employeeTotal: number;
 };
 
 export type ExternalApplyConfig = {
@@ -18,6 +46,12 @@ export type ExternalApplyConfig = {
 export type ExternalApplyResult = {
   applied: number;
   errors: Array<{ employeeFullName: string; reason: string }>;
+};
+
+export type ExternalApplyCallbacks = {
+  onProgress?: (event: ExternalApplyProgressEvent) => void | Promise<void>;
+  onError?: (event: ExternalApplyErrorEvent) => void | Promise<void>;
+  onEmployeeCompleted?: (event: ExternalEmployeeCompletedEvent) => void | Promise<void>;
 };
 
 function classNameToCss(className: string): string {
@@ -143,7 +177,8 @@ async function fillAndSaveSingleBonus(
 
 export async function applyExternalBonuses(
   config: ExternalApplyConfig,
-  bonuses: ExternalBonusToApply[]
+  bonuses: ExternalBonusToApply[],
+  callbacks: ExternalApplyCallbacks = {}
 ): Promise<ExternalApplyResult> {
   const timeoutMs = config.timeoutMs ?? 30_000;
   const headless = config.headless ?? true;
@@ -164,10 +199,31 @@ export async function applyExternalBonuses(
 
     const result: ExternalApplyResult = { applied: 0, errors: [] };
 
+    const total = bonuses.length;
+    let processed = 0;
     let lastEmployee: string | null = null;
     let employeeStarted = false;
 
+    // Employee completion stats (per employee for the given "bonuses" slice).
+    const employeeTotals = new Map<number, number>();
+    const employeeProcessed = new Map<number, number>();
+    const employeeApplied = new Map<number, number>();
+    const employeeErrors = new Map<number, number>();
+    const employeeFullNameById = new Map<number, string>();
+
     for (const bonus of bonuses) {
+      employeeTotals.set(bonus.employeeId, (employeeTotals.get(bonus.employeeId) ?? 0) + 1);
+      employeeProcessed.set(bonus.employeeId, employeeProcessed.get(bonus.employeeId) ?? 0);
+      employeeApplied.set(bonus.employeeId, employeeApplied.get(bonus.employeeId) ?? 0);
+      employeeErrors.set(bonus.employeeId, employeeErrors.get(bonus.employeeId) ?? 0);
+      employeeFullNameById.set(bonus.employeeId, bonus.employeeFullName);
+    }
+
+    for (const bonus of bonuses) {
+      const currentEmployeeId = bonus.employeeId;
+      const currentEmployeeFullName = bonus.employeeFullName;
+      let errorReason: string | null = null;
+
       try {
         if (bonus.employeeFullName !== lastEmployee) {
           lastEmployee = bonus.employeeFullName;
@@ -184,11 +240,67 @@ export async function applyExternalBonuses(
 
         await fillAndSaveSingleBonus(page, bonus, timeoutMs);
         result.applied += 1;
+
+        employeeApplied.set(currentEmployeeId, (employeeApplied.get(currentEmployeeId) ?? 0) + 1);
       } catch (e) {
+        errorReason = e instanceof Error ? e.message : String(e);
         result.errors.push({
           employeeFullName: bonus.employeeFullName,
-          reason: e instanceof Error ? e.message : String(e),
+          reason: errorReason,
         });
+
+        employeeErrors.set(currentEmployeeId, (employeeErrors.get(currentEmployeeId) ?? 0) + 1);
+      }
+
+      processed += 1;
+      employeeProcessed.set(
+        currentEmployeeId,
+        (employeeProcessed.get(currentEmployeeId) ?? 0) + 1
+      );
+
+      if (callbacks.onProgress) {
+        await callbacks.onProgress({
+        total,
+        processed,
+        applied: result.applied,
+        errorsCount: result.errors.length,
+        currentEmployeeId,
+        currentEmployeeFullName,
+        });
+      }
+
+      if (errorReason) {
+        if (callbacks.onError) {
+          await callbacks.onError({
+          employeeId: currentEmployeeId,
+          employeeFullName: currentEmployeeFullName,
+          reason: errorReason,
+          total,
+          processed,
+          applied: result.applied,
+          errorsCount: result.errors.length,
+          });
+        }
+      }
+
+      const finishedForEmployee =
+        (employeeProcessed.get(currentEmployeeId) ?? 0) === (employeeTotals.get(currentEmployeeId) ?? 0);
+
+      if (finishedForEmployee) {
+        const employeeTotal = employeeTotals.get(currentEmployeeId) ?? 0;
+        const employeeAppliedCount = employeeApplied.get(currentEmployeeId) ?? 0;
+        const employeeErrorsCount = employeeErrors.get(currentEmployeeId) ?? 0;
+
+        if (callbacks.onEmployeeCompleted) {
+          await callbacks.onEmployeeCompleted({
+            employeeId: currentEmployeeId,
+            employeeFullName:
+              employeeFullNameById.get(currentEmployeeId) ?? currentEmployeeFullName,
+            succeeded: employeeErrorsCount === 0,
+            employeeApplied: employeeAppliedCount,
+            employeeTotal,
+          });
+        }
       }
     }
 
