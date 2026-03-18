@@ -10,7 +10,6 @@ import type {
   BonusWithDetails,
 } from "@/lib/types";
 import { applyExternalBonuses } from "@/lib/external/apply-bonuses";
-import type { CookieParam } from "puppeteer";
 
 // ── Employees ──────────────────────────────────────────
 
@@ -185,19 +184,18 @@ export async function applyBonusesToExternalPage(params: {
     throw new Error("Некорректный месяц");
   }
 
-  const [targetUrl, cookiesJson] = await Promise.all([
+  const [targetUrl, externalBasicAuthUsername, externalBasicAuthPassword] = await Promise.all([
     getSetting("externalTargetUrl"),
-    getSetting("externalAuthCookiesJson"),
+    getSetting("externalBasicAuthUsername"),
+    getSetting("externalBasicAuthPassword"),
   ]);
 
   if (!targetUrl) throw new Error("Не задан externalTargetUrl в Settings");
 
-  let cookies: CookieParam[] = [];
-  try {
-    cookies = cookiesJson ? (JSON.parse(cookiesJson) as CookieParam[]) : [];
-    if (!Array.isArray(cookies)) cookies = [];
-  } catch {
-    throw new Error("externalAuthCookiesJson должен быть JSON массивом cookies");
+  if (!externalBasicAuthUsername || !externalBasicAuthPassword) {
+    throw new Error(
+      "Не заданы externalBasicAuthUsername/externalBasicAuthPassword в Settings"
+    );
   }
 
   const bonuses = await getBonusesForYearMonth(year, month);
@@ -219,7 +217,10 @@ export async function applyBonusesToExternalPage(params: {
   return await applyExternalBonuses(
     {
       targetUrl,
-      cookies,
+      basicAuth: {
+        username: externalBasicAuthUsername,
+        password: externalBasicAuthPassword,
+      },
       headless: true,
     },
     toApply

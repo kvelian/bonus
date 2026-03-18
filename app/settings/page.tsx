@@ -16,7 +16,8 @@ export default async function SettingsPage() {
     defaultBonusTypeId,
     defaultFundId,
     externalTargetUrl,
-    externalAuthCookiesJson,
+    externalBasicAuthUsername,
+    externalBasicAuthPassword,
   ] =
     await Promise.all([
       getEmployees(),
@@ -27,7 +28,8 @@ export default async function SettingsPage() {
       getSetting("defaultBonusTypeId"),
       getSetting("defaultFundId"),
       getSetting("externalTargetUrl"),
-      getSetting("externalAuthCookiesJson"),
+      getSetting("externalBasicAuthUsername"),
+      getSetting("externalBasicAuthPassword"),
     ]);
 
   return (
@@ -42,7 +44,8 @@ export default async function SettingsPage() {
         defaultBonusTypeId={defaultBonusTypeId ?? ""}
         defaultFundId={defaultFundId ?? ""}
         externalTargetUrl={externalTargetUrl ?? ""}
-        externalAuthCookiesJson={externalAuthCookiesJson ?? "[]"}
+        externalBasicAuthUsername={externalBasicAuthUsername ?? ""}
+        externalBasicAuthPassword={externalBasicAuthPassword ?? ""}
       />
     </div>
   );

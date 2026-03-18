@@ -100,7 +100,8 @@ async function ensureSchema(db: Client): Promise<void> {
 
   await ensureBonusTypeColumns(db);
   await ensureSettingKey(db, "externalTargetUrl", "");
-  await ensureSettingKey(db, "externalAuthCookiesJson", "[]");
+  await ensureSettingKey(db, "externalBasicAuthUsername", "");
+  await ensureSettingKey(db, "externalBasicAuthPassword", "");
 }
 
 async function ensureSettingKey(db: Client, key: string, defaultValue: string): Promise<void> {

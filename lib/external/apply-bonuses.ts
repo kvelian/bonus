@@ -1,4 +1,4 @@
-import puppeteer, { type CookieParam, type Page } from "puppeteer";
+import puppeteer, { type ElementHandle, type Page } from "puppeteer";
 
 export type ExternalBonusToApply = {
   employeeFullName: string;
@@ -10,7 +10,7 @@ export type ExternalBonusToApply = {
 
 export type ExternalApplyConfig = {
   targetUrl: string;
-  cookies: CookieParam[];
+  basicAuth: { username: string; password: string };
   timeoutMs?: number;
   headless?: boolean;
 };
@@ -44,13 +44,24 @@ async function findEmployeeRowHandle(page: Page, employeeFullName: string, timeo
   await page.waitForSelector("tbody tr", { timeout: timeoutMs });
   const handle = await page.evaluateHandle((fio) => {
     const rows = Array.from(document.querySelectorAll("tbody tr"));
-    const row =
-      rows.find((r) => r.textContent?.includes(fio)) ??
-      rows.find((r) =>
-        Array.from(r.querySelectorAll('[name-cell="fio"]')).some((n) =>
-          (n.textContent ?? "").trim() === fio
-        )
-      );
+    const normalize = (v: unknown) =>
+      String(v ?? "")
+        .replace(/\u00A0/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const target = normalize(fio);
+
+    // 1) Prefer exact match using dedicated FIO cell.
+    const exactRow = rows.find((r) => {
+      const cell = r.querySelector('[name-cell="fio"]');
+      if (!cell) return false;
+      return normalize(cell.textContent) === target;
+    });
+
+    // 2) Fallback: relaxed includes on whole row text.
+    const row = exactRow ?? rows.find((r) => normalize(r.textContent).includes(target));
+
     return row ?? null;
   }, employeeFullName);
   const el = handle.asElement();
@@ -58,7 +69,7 @@ async function findEmployeeRowHandle(page: Page, employeeFullName: string, timeo
   return el;
 }
 
-async function clickEditInRow(page: Page, row: puppeteer.ElementHandle<Element>, timeoutMs: number) {
+async function clickEditInRow(page: Page, row: ElementHandle<Node>, timeoutMs: number) {
   const edit = await row.$('img[title="Редактировать"], img[src*="edit.gif"]');
   if (!edit) throw new Error("Edit button not found in row");
   await edit.click();
@@ -113,9 +124,21 @@ async function fillAndSaveSingleBonus(
   }
 
   // Save per bonus
+  const validateAwardObjectsPromise = page.waitForResponse(
+    (resp) => resp.url().includes("validateawardobjects"),
+    { timeout: timeoutMs }
+  );
+  const savePremiumsPromise = page.waitForResponse(
+    (resp) => resp.url().includes("savepremiums"),
+    { timeout: timeoutMs }
+  );
+  const premiumApiPromise = page.waitForResponse(
+    (resp) => resp.url().includes("premiumapi"),
+    { timeout: timeoutMs }
+  );
   await waitAndClick(page, 'img.save-btn[title="Сохранить"], img[title="Сохранить"]', timeoutMs);
-  // Heuristic: wait a short tick for table refresh
-  await page.waitForNetworkIdle({ idleTime: 200, timeout: timeoutMs }).catch(() => {});
+  // Wait for the full save chain so the last bonus persists.
+  await Promise.all([validateAwardObjectsPromise, savePremiumsPromise, premiumApiPromise]);
 }
 
 export async function applyExternalBonuses(
@@ -133,10 +156,10 @@ export async function applyExternalBonuses(
     const page = await browser.newPage();
     page.setDefaultTimeout(timeoutMs);
 
-    if (config.cookies?.length) {
-      await page.setCookie(...config.cookies);
-    }
-
+    await page.authenticate({
+      username: config.basicAuth.username,
+      password: config.basicAuth.password,
+    });
     await page.goto(config.targetUrl, { waitUntil: "domcontentloaded" });
 
     const result: ExternalApplyResult = { applied: 0, errors: [] };

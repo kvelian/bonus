@@ -52,7 +52,8 @@ interface SettingsClientProps {
   defaultBonusTypeId: string;
   defaultFundId: string;
   externalTargetUrl: string;
-  externalAuthCookiesJson: string;
+  externalBasicAuthUsername: string;
+  externalBasicAuthPassword: string;
 }
 
 export function SettingsClient({
@@ -64,13 +65,17 @@ export function SettingsClient({
   defaultBonusTypeId: initialDefaultBonusTypeId,
   defaultFundId: initialDefaultFundId,
   externalTargetUrl: initialExternalTargetUrl,
-  externalAuthCookiesJson: initialExternalAuthCookiesJson,
+  externalBasicAuthUsername: initialExternalBasicAuthUsername,
+  externalBasicAuthPassword: initialExternalBasicAuthPassword,
 }: SettingsClientProps) {
   const { theme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
   const [externalTargetUrl, setExternalTargetUrl] = useState(initialExternalTargetUrl);
-  const [externalAuthCookiesJson, setExternalAuthCookiesJson] = useState(
-    initialExternalAuthCookiesJson || "[]"
+  const [externalBasicAuthUsername, setExternalBasicAuthUsername] = useState(
+    initialExternalBasicAuthUsername
+  );
+  const [externalBasicAuthPassword, setExternalBasicAuthPassword] = useState(
+    initialExternalBasicAuthPassword
   );
   const [bonusTypeSelectors, setBonusTypeSelectors] = useState(() => {
     const map = new Map<number, { amount: string; comment: string }>();
@@ -118,7 +123,7 @@ export function SettingsClient({
         <CardHeader>
           <CardTitle className="text-base">Внешняя страница (Puppeteer)</CardTitle>
           <p className="text-sm text-muted-foreground font-normal">
-            URL и cookies для пропуска авторизации.
+            URL и Basic Auth для доступа к внешней странице.
           </p>
         </CardHeader>
         <CardContent>
@@ -132,31 +137,32 @@ export function SettingsClient({
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Cookies JSON</Label>
-              <Textarea
-                value={externalAuthCookiesJson}
-                onChange={(e) => setExternalAuthCookiesJson(e.target.value)}
-                rows={5}
-                placeholder='[{"name":"...","value":"...","domain":"...","path":"/"}]'
-              />
-              <p className="text-xs text-muted-foreground">
-                Должен быть JSON-массив cookies для `page.setCookie(...)`.
-              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="flex flex-col gap-2">
+                  <Label>Basic Auth Username</Label>
+                  <Input
+                    value={externalBasicAuthUsername}
+                    onChange={(e) => setExternalBasicAuthUsername(e.target.value)}
+                    placeholder="username"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label>Basic Auth Password</Label>
+                  <Input
+                    type="password"
+                    value={externalBasicAuthPassword}
+                    onChange={(e) => setExternalBasicAuthPassword(e.target.value)}
+                    placeholder="password"
+                  />
+                </div>
+              </div>
             </div>
             <Button
               onClick={() => {
                 startTransition(async () => {
-                  try {
-                    JSON.parse(externalAuthCookiesJson || "[]");
-                  } catch {
-                    toast.error("Cookies JSON: некорректный JSON");
-                    return;
-                  }
                   await updateSetting("externalTargetUrl", externalTargetUrl.trim());
-                  await updateSetting(
-                    "externalAuthCookiesJson",
-                    (externalAuthCookiesJson || "[]").trim()
-                  );
+                  await updateSetting("externalBasicAuthUsername", externalBasicAuthUsername.trim());
+                  await updateSetting("externalBasicAuthPassword", externalBasicAuthPassword.trim());
                   toast.success("Настройки внешней страницы сохранены");
                 });
               }}
