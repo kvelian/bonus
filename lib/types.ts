@@ -6,6 +6,8 @@ export interface Employee {
 export interface BonusType {
   id: number;
   name: string;
+  externalAmountClass?: string | null;
+  externalCommentClass?: string | null;
 }
 
 export interface Fund {

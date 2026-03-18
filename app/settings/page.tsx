@@ -7,7 +7,17 @@ import {
 import { SettingsClient } from "./settings-client";
 
 export default async function SettingsPage() {
-  const [employees, bonusTypes, funds, defaultTaxRate, customIntroText, defaultBonusTypeId, defaultFundId] =
+  const [
+    employees,
+    bonusTypes,
+    funds,
+    defaultTaxRate,
+    customIntroText,
+    defaultBonusTypeId,
+    defaultFundId,
+    externalTargetUrl,
+    externalAuthCookiesJson,
+  ] =
     await Promise.all([
       getEmployees(),
       getBonusTypes(),
@@ -16,6 +26,8 @@ export default async function SettingsPage() {
       getSetting("customIntroText"),
       getSetting("defaultBonusTypeId"),
       getSetting("defaultFundId"),
+      getSetting("externalTargetUrl"),
+      getSetting("externalAuthCookiesJson"),
     ]);
 
   return (
@@ -29,6 +41,8 @@ export default async function SettingsPage() {
         customIntroText={customIntroText ?? ""}
         defaultBonusTypeId={defaultBonusTypeId ?? ""}
         defaultFundId={defaultFundId ?? ""}
+        externalTargetUrl={externalTargetUrl ?? ""}
+        externalAuthCookiesJson={externalAuthCookiesJson ?? "[]"}
       />
     </div>
   );

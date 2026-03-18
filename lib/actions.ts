@@ -9,6 +9,8 @@ import type {
   MonthStatus,
   BonusWithDetails,
 } from "@/lib/types";
+import { applyExternalBonuses } from "@/lib/external/apply-bonuses";
+import type { CookieParam } from "puppeteer";
 
 // ── Employees ──────────────────────────────────────────
 
@@ -55,7 +57,7 @@ export async function createBonusType(name: string): Promise<BonusType> {
   persist(db);
   revalidatePath("/");
   revalidatePath("/settings");
-  return { id: Number(result.lastInsertRowid), name };
+  return { id: Number(result.lastInsertRowid), name, externalAmountClass: null, externalCommentClass: null };
 }
 
 export async function updateBonusType(id: number, name: string): Promise<void> {
@@ -63,6 +65,20 @@ export async function updateBonusType(id: number, name: string): Promise<void> {
   await runSql(db, "UPDATE bonus_types SET name = ? WHERE id = ?", [name, id]);
   persist(db);
   revalidatePath("/");
+  revalidatePath("/settings");
+}
+
+export async function updateBonusTypeExternalSelectors(
+  id: number,
+  data: { externalAmountClass: string; externalCommentClass: string }
+): Promise<void> {
+  const db = await getDb();
+  await runSql(
+    db,
+    "UPDATE bonus_types SET externalAmountClass = ?, externalCommentClass = ? WHERE id = ?",
+    [data.externalAmountClass, data.externalCommentClass, id]
+  );
+  persist(db);
   revalidatePath("/settings");
 }
 
@@ -128,6 +144,86 @@ export async function updateSetting(key: string, value: string): Promise<void> {
   persist(db);
   revalidatePath("/");
   revalidatePath("/settings");
+}
+
+export async function getBonusesForYearMonth(year: number, month: number): Promise<
+  Array<
+    BonusWithDetails & {
+      employeeFullName: string;
+      bonusTypeExternalAmountClass: string | null;
+      bonusTypeExternalCommentClass: string | null;
+    }
+  >
+> {
+  const db = await getDb();
+  return await queryAll(db, `
+    SELECT
+      b.*,
+      bt.name as bonusTypeName,
+      f.name as fundName,
+      e.fullName as employeeFullName,
+      bt.externalAmountClass as bonusTypeExternalAmountClass,
+      bt.externalCommentClass as bonusTypeExternalCommentClass
+    FROM bonuses b
+    JOIN employees e ON b.employeeId = e.id
+    JOIN bonus_types bt ON b.bonusTypeId = bt.id
+    JOIN funds f ON b.fundId = f.id
+    WHERE b.year = ? AND b.month = ?
+    ORDER BY e.fullName, b.id
+  `, [year, month]);
+}
+
+export async function applyBonusesToExternalPage(params: {
+  year: number;
+  month: number;
+}): Promise<{ applied: number; errors: Array<{ employeeFullName: string; reason: string }> }> {
+  const { year, month } = params;
+  if (!Number.isFinite(year) || year < 2000 || year > 2100) {
+    throw new Error("Некорректный год");
+  }
+  if (!Number.isFinite(month) || month < 1 || month > 12) {
+    throw new Error("Некорректный месяц");
+  }
+
+  const [targetUrl, cookiesJson] = await Promise.all([
+    getSetting("externalTargetUrl"),
+    getSetting("externalAuthCookiesJson"),
+  ]);
+
+  if (!targetUrl) throw new Error("Не задан externalTargetUrl в Settings");
+
+  let cookies: CookieParam[] = [];
+  try {
+    cookies = cookiesJson ? (JSON.parse(cookiesJson) as CookieParam[]) : [];
+    if (!Array.isArray(cookies)) cookies = [];
+  } catch {
+    throw new Error("externalAuthCookiesJson должен быть JSON массивом cookies");
+  }
+
+  const bonuses = await getBonusesForYearMonth(year, month);
+  const toApply = bonuses
+    .map((b) => {
+      const amountClass = b.bonusTypeExternalAmountClass?.trim() ?? "";
+      const commentClass = b.bonusTypeExternalCommentClass?.trim() ?? "";
+      if (!amountClass || !commentClass) return null;
+      return {
+        employeeFullName: b.employeeFullName,
+        amountGross: b.amountGross,
+        comment: b.comment ?? "",
+        amountClass,
+        commentClass,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null);
+
+  return await applyExternalBonuses(
+    {
+      targetUrl,
+      cookies,
+      headless: true,
+    },
+    toApply
+  );
 }
 
 // ── Month Statuses ─────────────────────────────────────

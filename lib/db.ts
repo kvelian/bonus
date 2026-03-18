@@ -31,7 +31,9 @@ async function ensureSchema(db: Client): Promise<void> {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bonus_types (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL
+      name TEXT NOT NULL,
+      externalAmountClass TEXT,
+      externalCommentClass TEXT
     );
   `);
   await db.execute(`
@@ -94,6 +96,46 @@ async function ensureSchema(db: Client): Promise<void> {
       sql: "INSERT INTO settings (key, value) VALUES (?, ?)",
       args: ["customIntroText", "Уведомляем вас о начислении премии:"],
     });
+  }
+
+  await ensureBonusTypeColumns(db);
+  await ensureSettingKey(db, "externalTargetUrl", "");
+  await ensureSettingKey(db, "externalAuthCookiesJson", "[]");
+}
+
+async function ensureSettingKey(db: Client, key: string, defaultValue: string): Promise<void> {
+  const res = await db.execute({
+    sql: "SELECT key FROM settings WHERE key = ?",
+    args: [key],
+  });
+  if (!res.rows.length) {
+    await db.execute({
+      sql: "INSERT INTO settings (key, value) VALUES (?, ?)",
+      args: [key, defaultValue],
+    });
+  }
+}
+
+async function ensureBonusTypeColumns(db: Client): Promise<void> {
+  const pragma = await db.execute({
+    sql: "PRAGMA table_info(bonus_types)",
+    args: {},
+  });
+  const cols = new Set(
+    (pragma.rows ?? []).map((r) => {
+      if (typeof r === "object" && r && "name" in (r as Record<string, unknown>)) {
+        return String((r as Record<string, unknown>).name);
+      }
+      if (Array.isArray(r)) return String(r[1]);
+      return "";
+    })
+  );
+
+  if (!cols.has("externalAmountClass")) {
+    await db.execute("ALTER TABLE bonus_types ADD COLUMN externalAmountClass TEXT");
+  }
+  if (!cols.has("externalCommentClass")) {
+    await db.execute("ALTER TABLE bonus_types ADD COLUMN externalCommentClass TEXT");
   }
 }
 

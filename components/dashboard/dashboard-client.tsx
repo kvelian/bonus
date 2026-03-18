@@ -27,6 +27,15 @@ import {
   grossToNet,
   getEffectiveTaxRateSync,
 } from "@/lib/tax-utils";
+import { applyBonusesToExternalPage } from "@/lib/actions";
+import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DashboardClientProps {
   year: number;
@@ -54,6 +63,11 @@ export function DashboardClient({
   defaultFundId,
 }: DashboardClientProps) {
   const router = useRouter();
+  const [isApplyPending, setIsApplyPending] = useState(false);
+  const [applyMonth, setApplyMonth] = useState<string>(() => {
+    const m = new Date().getMonth() + 1;
+    return String(m);
+  });
   const [amountMode, setAmountMode] = useState<AmountMode>(() => {
     if (typeof window !== "undefined") {
       return (localStorage.getItem("bonus-amount-mode") as AmountMode) || "gross";
@@ -91,6 +105,25 @@ export function DashboardClient({
   const handleExportCsv = useCallback(() => {
     exportToCsv(employees, bonuses, monthStatuses, defaultTaxRate, year, amountMode);
   }, [employees, bonuses, monthStatuses, defaultTaxRate, year, amountMode]);
+
+  const handleApplyExternal = useCallback(async () => {
+    setIsApplyPending(true);
+    try {
+      const month = parseInt(applyMonth, 10);
+      const res = await applyBonusesToExternalPage({ year, month });
+      if (res.errors.length) {
+        toast.error(
+          `Применено: ${res.applied}. Ошибок: ${res.errors.length} (первый: ${res.errors[0]!.employeeFullName})`
+        );
+      } else {
+        toast.success(`Готово. Применено премий: ${res.applied}`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ошибка запуска скрипта");
+    } finally {
+      setIsApplyPending(false);
+    }
+  }, [applyMonth, year]);
 
   const openBonusModal = useCallback(
     (employeeId: number, month: number, editBonus?: BonusWithDetails) => {
@@ -154,6 +187,30 @@ export function DashboardClient({
           <Download className="h-4 w-4 mr-2" />
           CSV
         </Button>
+
+        <div className="flex items-center gap-2">
+          <Select value={applyMonth} onValueChange={setApplyMonth}>
+            <SelectTrigger className="h-8 w-[140px]">
+              <SelectValue placeholder="Месяц" />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <SelectItem key={m} value={String(m)}>
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isApplyPending}
+            onClick={handleApplyExternal}
+          >
+            Применить
+          </Button>
+        </div>
       </div>
 
       {/* Bonus Table */}

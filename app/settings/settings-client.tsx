@@ -36,6 +36,7 @@ import {
   createBonusType,
   updateBonusType,
   deleteBonusType,
+  updateBonusTypeExternalSelectors,
   createFund,
   updateFund,
   deleteFund,
@@ -50,6 +51,8 @@ interface SettingsClientProps {
   customIntroText: string;
   defaultBonusTypeId: string;
   defaultFundId: string;
+  externalTargetUrl: string;
+  externalAuthCookiesJson: string;
 }
 
 export function SettingsClient({
@@ -60,9 +63,25 @@ export function SettingsClient({
   customIntroText: initialIntroText,
   defaultBonusTypeId: initialDefaultBonusTypeId,
   defaultFundId: initialDefaultFundId,
+  externalTargetUrl: initialExternalTargetUrl,
+  externalAuthCookiesJson: initialExternalAuthCookiesJson,
 }: SettingsClientProps) {
   const { theme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
+  const [externalTargetUrl, setExternalTargetUrl] = useState(initialExternalTargetUrl);
+  const [externalAuthCookiesJson, setExternalAuthCookiesJson] = useState(
+    initialExternalAuthCookiesJson || "[]"
+  );
+  const [bonusTypeSelectors, setBonusTypeSelectors] = useState(() => {
+    const map = new Map<number, { amount: string; comment: string }>();
+    initialBonusTypes.forEach((bt) => {
+      map.set(bt.id, {
+        amount: (bt.externalAmountClass ?? "") as string,
+        comment: (bt.externalCommentClass ?? "") as string,
+      });
+    });
+    return map;
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -93,6 +112,63 @@ export function SettingsClient({
 
       {/* Custom Intro Text */}
       <IntroTextSection initialText={initialIntroText} />
+
+      {/* External page integration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Внешняя страница (Puppeteer)</CardTitle>
+          <p className="text-sm text-muted-foreground font-normal">
+            URL и cookies для пропуска авторизации.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label>URL</Label>
+              <Input
+                value={externalTargetUrl}
+                onChange={(e) => setExternalTargetUrl(e.target.value)}
+                placeholder="https://..."
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label>Cookies JSON</Label>
+              <Textarea
+                value={externalAuthCookiesJson}
+                onChange={(e) => setExternalAuthCookiesJson(e.target.value)}
+                rows={5}
+                placeholder='[{"name":"...","value":"...","domain":"...","path":"/"}]'
+              />
+              <p className="text-xs text-muted-foreground">
+                Должен быть JSON-массив cookies для `page.setCookie(...)`.
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                startTransition(async () => {
+                  try {
+                    JSON.parse(externalAuthCookiesJson || "[]");
+                  } catch {
+                    toast.error("Cookies JSON: некорректный JSON");
+                    return;
+                  }
+                  await updateSetting("externalTargetUrl", externalTargetUrl.trim());
+                  await updateSetting(
+                    "externalAuthCookiesJson",
+                    (externalAuthCookiesJson || "[]").trim()
+                  );
+                  toast.success("Настройки внешней страницы сохранены");
+                });
+              }}
+              disabled={isPending}
+              size="sm"
+              className="self-start"
+            >
+              Сохранить
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Default values for new bonus */}
       <DefaultBonusSection
@@ -146,6 +222,86 @@ export function SettingsClient({
           />
         )}
       />
+
+      {/* Bonus type -> external selectors */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Селекторы полей для типов премий</CardTitle>
+          <p className="text-sm text-muted-foreground font-normal">
+            Укажите className (как на внешней странице) для суммы GROSS и комментария.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4">
+            {initialBonusTypes.map((bt) => {
+              const current = bonusTypeSelectors.get(bt.id) ?? { amount: "", comment: "" };
+              return (
+                <div
+                  key={bt.id}
+                  className="rounded-md border border-border bg-card p-3"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={cn(
+                          "shrink-0 w-2 h-2 rounded-full",
+                          getBonusTypeColor(bt.id)
+                        )}
+                        aria-hidden
+                      />
+                      <span className="text-sm font-medium truncate">{bt.name}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isPending}
+                      onClick={() => {
+                        startTransition(async () => {
+                          const v = bonusTypeSelectors.get(bt.id) ?? { amount: "", comment: "" };
+                          await updateBonusTypeExternalSelectors(bt.id, {
+                            externalAmountClass: v.amount.trim(),
+                            externalCommentClass: v.comment.trim(),
+                          });
+                          toast.success("Сохранено");
+                        });
+                      }}
+                    >
+                      Сохранить
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-2">
+                      <Label>ClassName суммы (GROSS)</Label>
+                      <Input
+                        value={current.amount}
+                        onChange={(e) => {
+                          const next = new Map(bonusTypeSelectors);
+                          next.set(bt.id, { ...current, amount: e.target.value });
+                          setBonusTypeSelectors(next);
+                        }}
+                        placeholder="premiumMonth amount"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label>ClassName комментария</Label>
+                      <Input
+                        value={current.comment}
+                        onChange={(e) => {
+                          const next = new Map(bonusTypeSelectors);
+                          next.set(bt.id, { ...current, comment: e.target.value });
+                          setBonusTypeSelectors(next);
+                        }}
+                        placeholder="premiumMonthDescription"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Funds */}
       <CrudSection
